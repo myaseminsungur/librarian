@@ -13,10 +13,11 @@ class TestLibraryCLI:
     
     def setup_method(self):
         """Set up test fixtures before each test method"""
-        with patch.object(Library, 'load_books'):
-            self.cli = LibraryCLI()
-            # Ensure we start with an empty library for each test
-            self.cli.library.books = []
+        with patch('open_library.OpenLibraryClient'):
+            with patch.object(Library, 'load_books'):
+                self.cli = LibraryCLI()
+                # Ensure we start with an empty library for each test
+                self.cli.library.books = []
     
     def test_cli_initialization(self):
         """Test CLI initialization creates a library"""
@@ -44,29 +45,32 @@ class TestLibraryCLI:
     @patch('builtins.input')
     def test_add_book_menu_success(self, mock_input):
         """Test adding a book through menu successfully"""
-        mock_input.side_effect = ["Test Title", "Test Author", "1111111111"]
+        mock_input.return_value = "1111111111"
         
-        with patch('builtins.print') as mock_print:
-            self.cli.add_book_menu()
+        # Mock the Open Library client to return a book
+        test_book = Book("Test Title", "Test Author", "1111111111")
+        with patch.object(self.cli.library.open_library_client, 'get_book_by_isbn', return_value=test_book):
+            with patch('builtins.print') as mock_print:
+                self.cli.add_book_menu()
+                
+                # Check success message was printed
+                calls = [str(call) for call in mock_print.call_args_list]
+                success_message = ' '.join(calls)
+                assert "Successfully added" in success_message
             
-            # Check success message was printed
-            calls = [str(call) for call in mock_print.call_args_list]
-            success_message = ' '.join(calls)
-            assert "Successfully added" in success_message
-        
-        # Check book was added to library
-        assert len(self.cli.library.books) == 1
-        assert self.cli.library.books[0].title == "Test Title"
+            # Check book was added to library
+            assert len(self.cli.library.books) == 1
+            assert self.cli.library.books[0].title == "Test Title"
     
     @patch('builtins.input')
     def test_add_book_menu_empty_fields(self, mock_input):
-        """Test adding book with empty fields shows error"""
-        mock_input.side_effect = ["", "Author", "ISBN"]
+        """Test adding book with empty ISBN shows error"""
+        mock_input.return_value = ""
         
         with patch('builtins.print') as mock_print:
             self.cli.add_book_menu()
             
-            mock_print.assert_called_with("❌ All fields are required!")
+            mock_print.assert_called_with("❌ ISBN is required!")
         
         # No book should be added
         assert len(self.cli.library.books) == 0
@@ -75,9 +79,10 @@ class TestLibraryCLI:
     def test_add_book_menu_duplicate_isbn(self, mock_input):
         """Test adding book with duplicate ISBN shows error"""
         # Add a book first
-        self.cli.library.add_book(Book("Existing", "Author", "2222222222"))
+        existing_book = Book("Existing", "Author", "2222222222")
+        self.cli.library.books.append(existing_book)
         
-        mock_input.side_effect = ["New Title", "New Author", "2222222222"]
+        mock_input.return_value = "2222222222"
         
         with patch('builtins.print') as mock_print:
             self.cli.add_book_menu()
@@ -91,7 +96,8 @@ class TestLibraryCLI:
     def test_remove_book_menu_success(self, mock_input):
         """Test removing a book through menu successfully"""
         # Add a book first
-        self.cli.library.add_book(Book("Test Book", "Test Author", "3333333333"))
+        test_book = Book("Test Book", "Test Author", "3333333333")
+        self.cli.library.books.append(test_book)
         
         mock_input.return_value = "3333333333"
         
@@ -113,7 +119,9 @@ class TestLibraryCLI:
     
     def test_list_books_menu_with_books(self):
         """Test listing books when library has books"""
-        self.cli.library.add_book(Book("Test Book", "Test Author", "4444444444"))
+        # Directly add book to library for testing
+        test_book = Book("Test Book", "Test Author", "4444444444")
+        self.cli.library.books.append(test_book)
         
         with patch('builtins.print') as mock_print:
             self.cli.list_books_menu()
@@ -135,7 +143,8 @@ class TestLibraryCLI:
     @patch('builtins.input')
     def test_find_books_menu_success(self, mock_input):
         """Test finding books through menu successfully"""
-        self.cli.library.add_book(Book("Python Guide", "John Doe", "5555555555"))
+        test_book = Book("Python Guide", "John Doe", "5555555555")
+        self.cli.library.books.append(test_book)
         
         mock_input.side_effect = ["1", "Python"]  # Search by title for "Python"
         
@@ -227,7 +236,7 @@ class TestLibraryCLI:
     def test_handle_choice_exit(self):
         """Test handle_choice for exit option"""
         with patch('builtins.print') as mock_print:
-            result = self.cli.handle_choice('7')
+            result = self.cli.handle_choice('8')
             
             mock_print.assert_called_with("👋 Thank you for using Library Management System!")
             assert result is False
@@ -237,5 +246,5 @@ class TestLibraryCLI:
         with patch('builtins.print') as mock_print:
             result = self.cli.handle_choice('99')
             
-            mock_print.assert_called_with("❌ Invalid choice! Please enter 1-7.")
+            mock_print.assert_called_with("❌ Invalid choice! Please enter 1-8.")
             assert result is True

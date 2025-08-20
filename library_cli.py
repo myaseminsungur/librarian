@@ -14,26 +14,37 @@ class LibraryCLI:
         print("4. Find books")
         print("5. Load books from file")
         print("6. Save books to file")
-        print("7. Exit")
+        print("7. Search books online")
+        print("8. Exit")
         print("=" * 35)
 
     def add_book_menu(self):
         print("\n--- Add New Book ---")
-        title = input("Enter book title: ").strip()
-        author = input("Enter author name: ").strip()
+        # title = input("Enter book title: ").strip()
+        # author = input("Enter author name: ").strip()
         isbn = input("Enter ISBN: ").strip()
-        
-        if not title or not author or not isbn:
-            print("❌ All fields are required!")
+
+        # if not title or not author or not isbn:
+        #     print("❌ All fields are required!")
+        #     return
+        if not isbn:
+            print("❌ ISBN is required!")
             return
         
         try:
-            book = Book(title, author, isbn)
-            self.library.add_book(book)
-            print(f"✅ Successfully added: {book}")
+            self.library.add_book(isbn)
+            print(f"✅ Successfully added {isbn}")
         except ValueError as e:
             print(f"❌ Error: {e}")
 
+    def search_books_menu(self):
+        print("\n--- Search Books Online ---")
+        query = input("Enter search term: ").strip()
+        if not query:
+            print("❌ Search term is required!")
+            return
+        self.library.search_books_online(query)
+        
     def remove_book_menu(self):
         print("\n--- Remove Book ---")
         isbn = input("Enter ISBN of book to remove: ").strip()
@@ -119,9 +130,11 @@ class LibraryCLI:
         elif choice == '6':
             self.save_books_menu()
         elif choice == '7':
+            self.search_books_menu()
+        elif choice == '8':
             print("👋 Thank you for using Library Management System!")
             return False
         else:
-            print("❌ Invalid choice! Please enter 1-7.")
+            print("❌ Invalid choice! Please enter 1-8.")
         
         return True

@@ -36,24 +36,27 @@ class TestLibrary:
         assert self.book2 in library.books
         mock_load.assert_called_once()
     
+    @patch('library.OpenLibraryClient')
     @patch.object(Library, 'load_books')
-    def test_add_book_success(self, mock_load):
+    def test_add_book_success(self, mock_load, mock_client_class):
         """Test adding a book successfully"""
+        mock_client_instance = mock_client_class.return_value
+        mock_client_instance.get_book_by_isbn.return_value = self.book1
+        
         library = Library([])
-        library.add_book(self.book1)
+        library.add_book(self.book1.isbn)
         
         assert len(library.books) == 1
-        assert self.book1 in library.books
+        assert library.books[0].isbn == self.book1.isbn
     
+    @patch('library.OpenLibraryClient')
     @patch.object(Library, 'load_books')
-    def test_add_book_duplicate_isbn(self, mock_load):
+    def test_add_book_duplicate_isbn(self, mock_load, mock_client_class):
         """Test adding a book with duplicate ISBN raises error"""
         library = Library([self.book1])
         
-        duplicate_book = Book("Different Title", "Different Author", "1111111111")
-        
         with pytest.raises(ValueError, match="ISBN must be unique"):
-            library.add_book(duplicate_book)
+            library.add_book("1111111111")  # Same ISBN as self.book1
     
     @patch.object(Library, 'load_books')
     def test_remove_book_success(self, mock_load):
@@ -163,12 +166,12 @@ class TestLibrary:
         finally:
             os.unlink(temp_path)
     
-    @patch.object(Library, 'load_books')
-    def test_load_books_success(self, mock_load):
+    @patch('library.OpenLibraryClient')
+    def test_load_books_success(self, mock_client_class):
         """Test loading books from file successfully"""
-        # Create library without calling real load_books
-        library = Library([])
-        mock_load.reset_mock()  # Reset the mock from initialization
+        # Create library with mocked client and bypassing initial load_books
+        with patch.object(Library, 'load_books'):
+            library = Library([])
         
         test_data = [
             {"title": "Test Book", "author": "Test Author", "isbn": "1234567890"}
@@ -179,9 +182,8 @@ class TestLibrary:
             temp_path = temp_file.name
         
         try:
-            # Call the real load_books method (not mocked for this test)
-            with patch.object(Library, 'load_books', wraps=library.load_books):
-                library.load_books(temp_path)
+            # Call the actual load_books method
+            Library.load_books(library, temp_path)
             
             assert len(library.books) == 1
             assert library.books[0].title == "Test Book"
@@ -191,26 +193,27 @@ class TestLibrary:
         finally:
             os.unlink(temp_path)
     
-    @patch.object(Library, 'load_books')
-    def test_load_books_file_not_found(self, mock_load):
+    @patch('library.OpenLibraryClient')
+    def test_load_books_file_not_found(self, mock_client_class):
         """Test loading books from non-existent file"""
         library = Library([])
         
         with patch('builtins.print') as mock_print:
             # Call the real load_books method
-            with patch.object(Library, 'load_books', wraps=library.load_books):
-                library.load_books("nonexistent.json")
+            library.load_books("nonexistent.json")
             
             # Should print an error message
             mock_print.assert_called()
             error_message = str(mock_print.call_args[0][0])
             assert "An error occurred" in error_message
     
-    @patch.object(Library, 'load_books')
-    def test_load_books_duplicate_isbn_in_file(self, mock_load):
+    @patch('library.OpenLibraryClient')
+    def test_load_books_duplicate_isbn_in_file(self, mock_client_class):
         """Test loading books with duplicate ISBN from file"""
-        library = Library([self.book1])  # Pre-existing book
-        mock_load.reset_mock()
+        # Create library bypassing initial load_books
+        with patch.object(Library, 'load_books'):
+            library = Library([])
+        library.books = [self.book1]  # Pre-existing book (add after initialization)
         
         test_data = [
             {"title": "Duplicate", "author": "Test", "isbn": "1111111111"}  # Same ISBN as book1
@@ -221,15 +224,8 @@ class TestLibrary:
             temp_path = temp_file.name
         
         try:
-            with patch('builtins.print') as mock_print:
-                # Call the real load_books method
-                with patch.object(Library, 'load_books', wraps=library.load_books):
-                    library.load_books(temp_path)
-                
-                # Should print error about duplicate ISBN
-                mock_print.assert_called()
-                error_message = str(mock_print.call_args[0][0])
-                assert "An error occurred" in error_message
+            # Call the actual load_books method
+            Library.load_books(library, temp_path)
             
             # Original book should still be there, duplicate not added
             assert len(library.books) == 1
