@@ -36,6 +36,7 @@ class Library():
     def list_books(self):
         for book in self.books:
             print(book)
+        
 
     def find_book(self, query: str, search_by: Literal["title", "author", "isbn"] = "title"):
         query_lower = query.lower()
